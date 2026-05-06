@@ -68,6 +68,8 @@ Websidian 개발의 기본 원칙은 아래와 같다.
 - 프론트 구조: `docs/frontend/*`
 - 인프라/실행: `docs/infra/*`, `docs/operations/*`
 
+추가로 개인적인 학습 내용은 `docs/learning/*`에 정리한다
+
 ### 3. 작업 범위 줄이기
 
 한 번에 너무 많이 하지 않는다.
