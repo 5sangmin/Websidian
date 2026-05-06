@@ -2,12 +2,12 @@
 
 ## Purpose
 
-이 문서는 Websidian을 혼자 개발할 때 어떤 순서로 작업하고, 무엇을 문서화하고, 어떤 기준으로 코드를 수정할지 정리한 개인 개발 가이드다.
+이 문서는 Websidian을 개발할 때 어떤 순서로 작업하고, 무엇을 문서화하고, 어떤 기준으로 코드를 수정할지 정리한 개인 개발 가이드다.
 
 이 문서의 목적은 팀 협업 절차를 정의하는 것이 아니다.
 목적은 작업 흐름이 흔들리지 않게 하고, 시간이 지난 뒤에도 다시 프로젝트를 쉽게 이어갈 수 있도록 하는 것이다.
 
-즉, 이 문서는 혼자 개발하는 나를 위한 최소 규약 문서다.
+즉, 이 문서는 개발의 최소 규약 문서다.
 
 ## Core principle
 
@@ -20,7 +20,7 @@ Websidian 개발의 기본 원칙은 아래와 같다.
 5. 실행해 보고 확인한 뒤 다음 단계로 간다.
 
 핵심은 속도보다 지속 가능성이다.
-혼자 개발할 때 가장 위험한 것은 느림이 아니라, 문맥을 잃고 프로젝트를 다시 못 이어가는 것이다.
+개발할 때 가장 위험한 것은 느림이 아니라, 문맥을 잃고 프로젝트를 다시 못 이어가는 것이다.
 
 ## Daily workflow
 
@@ -34,8 +34,6 @@ Websidian 개발의 기본 원칙은 아래와 같다.
 6. 직접 실행해서 확인한다.
 7. 필요한 문서를 갱신한다.
 8. 다음 작업 메모를 남긴다.
-
-이 흐름은 단순하지만, 혼자 개발할 때 가장 안정적이다.
 
 ## Before starting work
 
@@ -68,7 +66,8 @@ Websidian 개발의 기본 원칙은 아래와 같다.
 - 프론트 구조: `docs/frontend/*`
 - 인프라/실행: `docs/infra/*`, `docs/operations/*`
 
-추가로 개인적인 학습 내용은 `docs/learning/*`에 정리한다
+추가로 개인적인 학습 내용은 `docs/learning/*`,  
+진행 중 작업 메모와 세션 기록은 `docs/working/*`에 정리한다.
 
 ### 3. 작업 범위 줄이기
 
@@ -119,7 +118,7 @@ Websidian 개발의 기본 원칙은 아래와 같다.
 
 ## Recommended work unit
 
-혼자 개발할 때는 작업 단위를 작게 유지해야 한다.
+개발할 때는 작업 단위를 작게 유지해야 한다.
 권장 단위는 아래 정도다.
 
 - 한 API 엔드포인트
@@ -207,68 +206,26 @@ Websidian 개발의 기본 원칙은 아래와 같다.
 
 ## Git usage
 
-혼자 개발하더라도 Git 사용 원칙은 단순하게 유지한다.
+개인 개발이더라도 Git 사용 원칙은 단순하게 유지한다.
 
-### Branch rule
+실제 Git 운영 규칙과 배포/AI 사용 기준은 [`git-workflow-and-ai-usage-rules.md`](./git-workflow-and-ai-usage-rules.md)에서 관리한다.  
+반복해서 사용하는 작업 초안은 `templates/` 디렉토리에 따로 정리하며, 이슈, PR, 커밋, 릴리즈, 작업 메모 템플릿은 필요할 때 복사해서 사용한다.
 
-기본 원칙은 아래와 같다.
+이 문서에서는 Git의 상세 규칙을 모두 반복하지 않고, development guide의 흐름과 직접 연결되는 최소 원칙만 유지한다.
+
+### Minimal Git principle
 
 - `main`은 가능한 한 다시 시작 가능한 상태로 유지한다.
 - 큰 작업은 바로 `main`에서 하지 않는다.
 - 기능/수정 단위 작업은 짧은 브랜치로 만든다.
-- 브랜치는 오래 끌지 않는다.
+- 커밋은 읽히는 기록으로 남긴다.
+- 머지 전에는 반드시 한 번 멈춰서 diff와 실행 결과를 확인한다.
 
-권장 브랜치 이름 예시:
-
-- `feat/entry-document-api`
-- `fix/html-embed-rendering`
-- `chore/compose-env-cleanup`
-- `docs/update-readme`
-
-꼭 복잡한 브랜치 전략이 필요한 것은 아니지만, 작업 단위가 커질수록 짧은 브랜치를 쓰는 편이 안전하다.
-
-### Commit rule
-
-커밋은 미래의 내가 읽을 기록이다.
-아래 원칙을 따른다.
-
-- 한 커밋에는 한 가지 목적만 담는다.
-- 커밋 제목만 읽어도 무엇이 바뀌었는지 보여야 한다.
-- 너무 큰 커밋을 만들지 않는다.
-- 필요하면 본문에 왜 바꿨는지 적는다.
-
-권장 형식:
-
-```text
-type(scope): summary
-```
-
-예:
-- `feat(document): add document detail API`
-- `fix(embed): handle missing html target`
-- `docs(readme): rewrite project overview`
-- `chore(infra): add compose env example`
-
-커밋 메시지는 완벽한 규칙보다 읽히는 기록이 더 중요하다.
-
-### Self-review rule
-
-혼자 개발하더라도 커밋 직전 또는 main 머지 전에는 한 번 멈춰서 diff를 본다.
-
-체크:
-- 관련 없는 변경이 섞이지 않았는가
-- 디버그 코드가 남아 있지 않은가
-- 문서 수정이 빠지지 않았는가
-- 이름이 이상하지 않은가
-- 실행 확인을 했는가
-
-혼자 개발에서 self-review는 PR 리뷰를 대신하는 가장 중요한 습관 중 하나다.
-
-## Rules for solo development
+## Rules for development
 
 ### Rule 1. main을 항상 다시 시작 가능한 상태로 유지한다
 
-혼자 개발하더라도 main은 가능한 한 깨끗하게 유지한다.
+개인 개발이더라도 main은 가능한 한 깨끗하게 유지한다.
 너무 큰 미완성 변경을 오래 끌지 않는다.
 
 ### Rule 2. 기능 추가와 구조 정리를 가능한 분리한다
@@ -291,7 +248,7 @@ type(scope): summary
 
 ### Rule 4. 한 번에 한 문제만 푼다
 
-혼자 개발할 때 가장 흔한 실수는 한 작업을 하다가 다른 문제까지 계속 파고드는 것이다.
+개발할 때 가장 흔한 실수는 한 작업을 하다가 다른 문제까지 계속 파고드는 것이다.
 작업 중 새 문제가 보이면 바로 해결하지 말고 메모만 남긴다.
 
 ### Rule 5. 나중의 나를 위한 흔적을 남긴다
@@ -333,7 +290,7 @@ README는 프로젝트 입구다.
 
 ### Development docs
 
-협업 규칙이 아니라, 혼자 개발할 때 다시 리듬을 찾기 위한 문서로 유지한다.
+개발 흐름을 잃었을 때, 길을 찾기 위한 문서로 유지한다.
 
 ## Coding discipline
 
@@ -347,7 +304,7 @@ controller, service, repository, component, composable, schema 책임을 섞지 
 
 ### 작동만 하지 말고 읽히게 만든다
 
-혼자 개발이라도 결국 가장 자주 코드를 읽는 사람은 미래의 나다.
+개인 개발이라도 결국 가장 자주 코드를 읽는 사람은 나다.
 
 ### 예외를 무시하지 않는다
 
@@ -398,7 +355,7 @@ controller, service, repository, component, composable, schema 책임을 섞지 
 
 ## Recommended rhythm
 
-혼자 개발할 때는 아래 리듬이 좋다.
+개발할 때는 아래 리듬이 좋다.
 
 1. 작게 계획
 2. 작게 구현
@@ -421,6 +378,6 @@ controller, service, repository, component, composable, schema 책임을 섞지 
 
 ## Final principle
 
-Websidian을 혼자 개발할 때의 핵심 원칙은 아래와 같다.
+Websidian을 개발할 때의 핵심 원칙은 아래와 같다.
 
 **작게 나누고, 직접 확인하고, 잊을 것만 문서로 남긴다.**
