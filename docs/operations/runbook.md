@@ -111,11 +111,22 @@ Runbook은 단순 참고 문서가 아니라, 반복 가능한 운영 절차를 
 - Backend 포트
 - Frontend 포트
 
-### 3. Application Health
-확인 항목:
-- backend health endpoint 응답
-- frontend 메인 페이지 응답
-- Vault/Document 조회 API 응답
+### Backend health endpoint
+
+현재 기준 backend 애플리케이션 헬스 체크 엔드포인트는 Spring Boot Actuator의 기본 경로를 사용한다.
+
+- URL: `GET /actuator/health`
+- 정상 응답 예:
+  - 상태 코드: `200 OK`
+  - Body(예시): `{"status":"UP"}`
+- 확인 방법 (로컬 기준):
+
+```bash
+curl -s http://localhost:8080/actuator/health
+```
+
+- `status`가 `UP`이면 backend 프로세스와 기본 의존성(DB 연결 등)이 정상으로 간주한다.
+- `DOWN` 또는 오류 응답인 경우, 먼저 DB/MinIO 연결 설정과 Compose 컨테이너 상태를 확인한다.
 
 ### 4. Dependency Connectivity
 확인 항목:
