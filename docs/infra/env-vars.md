@@ -152,6 +152,8 @@ MinIO 서비스용 값
 
 ## Example `.env.example`
 
+## Example `.env.example`
+
 아래는 예시 형식이다.
 
 ```env
@@ -165,42 +167,53 @@ VITE_APP_TITLE=Websidian
 
 BACKEND_PORT=8080
 SPRING_PROFILES_ACTIVE=dev
-DB_URL=jdbc:postgresql://postgres:5432/websidian
-DB_USERNAME=websidian
-DB_PASSWORD=change-me
+DB_URL=jdbc:postgresql://postgres:5432/websidian-pgsql
+DB_USERNAME=websidian_pgsql
+DB_PASSWORD=change_me
 
-POSTGRES_DB=websidian
-POSTGRES_USER=websidian
-POSTGRES_PASSWORD=change-me
+POSTGRES_DB=websidian-pgsql
+POSTGRES_USER=websidian_pgsql
+POSTGRES_PASSWORD=change_me
 POSTGRES_PORT=5432
 
 MINIO_ENDPOINT=http://minio:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=change-me
-MINIO_BUCKET=websidian-dev
+MINIO_ACCESS_KEY=websidian_minio
+MINIO_SECRET_KEY=change_me
+MINIO_BUCKET=websidian_minio_dev
 
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=change-me
+MINIO_ROOT_USER=websidian_minio
+MINIO_ROOT_PASSWORD=change_me
 MINIO_API_PORT=9000
 MINIO_CONSOLE_PORT=9001
 ```
 
 이 값들은 예시일 뿐 실제 비밀값으로 사용하면 안 된다.
 
-## Naming Policy
+## Naming policy
 
-환경 변수 이름은 다음 규칙을 따른다.
+환경 변수 이름과 값은 다음 규칙을 따른다.
 
-- 대문자 snake_case 사용
-- prefix로 범위를 드러냄
-- 의미가 분명한 이름 사용
-- 프론트엔드 노출 변수는 `VITE_` prefix 사용
+### 1. Key naming (변수 이름)
+
+- 대문자 snake_case 사용.
+- prefix로 범위를 드러낸다 (`APP_*`, `POSTGRES_*`, `MINIO_*`, `VITE_*` 등).
+- 의미가 분명한 이름을 사용한다.
+- 프론트엔드 노출 변수는 `VITE_` prefix를 사용한다.
 
 예:
+
 - 좋음: `MINIO_SECRET_KEY`
 - 나쁨: `SECRET`
 - 좋음: `POSTGRES_PASSWORD`
 - 나쁨: `DB_PASS`
+
+### 2. Value naming (변수 값)
+
+- 기본값은 언더바(`_`)를 사용한다.
+- URL, 호스트 등 리소스/엔드포인트 값에 한해서만 하이픈(`-`)을 허용한다.
+- 계정/자격/비밀번호/버킷 이름 등 “주체나 자격” 값은 모두 언더바를 사용한다.
+- 예: `websidian_pgsql`, `websidian_minio`, `websidian_minio_dev`, `change_me`
+- 예외: `jdbc:postgresql://localhost:5432/websidian-pgsql` 처럼 JDBC/HTTP URL 내부 리소스 이름에는 하이픈을 허용할 수 있다.
 
 ## Secret Handling Policy
 
