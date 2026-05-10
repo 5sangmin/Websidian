@@ -30,56 +30,71 @@ Websidian의 ERD는 다음 원칙을 따른다.
 ### 1. vaults
 문서 저장소의 최상위 단위다.
 
-주요 컬럼 예시:
-- id
-- owner_id
-- slug
-- name
-- description
-- visibility
-- entry_document_id
-- created_at
-- updated_at
+주요 컬럼:
+- id (UUID)
+- owner_id (UUID, NULL)
+- slug (VARCHAR, NOT NULL)
+- name (VARCHAR, NOT NULL)
+- description (TEXT, NULL)
+- visibility (VARCHAR, NOT NULL)
+- entry_document_id (UUID, NULL)
+- created_at (TIMESTAMPTZ, NOT NULL)
+- updated_at (TIMESTAMPTZ, NOT NULL)
+- deleted_at (TIMESTAMPTZ, NULL)
 
 설명:
 - 하나의 Vault는 여러 문서를 가진다.
-- 하나의 Vault는 하나의 대표 문서를 가질 수 있다.
+- 하나의 Vault는 하나의 대표 문서(`entry_document_id`)를 가질 수 있다.
+- `owner_id`는 초기에는 nullable로 두고, 사용자 모델 정리 후 FK를 검토한다.
+- `visibility`는 `public`, `private` 등의 공개 범위를 나타낸다.
+- 삭제는 `deleted_at` timestamp로 soft delete를 우선한다.
 
 ### 2. documents
 사용자가 읽고 탐색하는 기본 문서 엔티티다.
 
-주요 컬럼 예시:
-- id
-- vault_id
-- slug
-- title
-- document_type
-- status
-- current_version_id
-- created_by
-- created_at
-- updated_at
+주요 컬럼:
+- id (UUID)
+- vault_id (UUID, NOT NULL)
+- slug (VARCHAR, NOT NULL)
+- title (VARCHAR, NOT NULL)
+- document_type (VARCHAR, NOT NULL)
+- status (VARCHAR, NOT NULL)
+- current_version_id (UUID, NULL)
+- created_by (UUID, NULL)
+- created_at (TIMESTAMPTZ, NOT NULL)
+- updated_at (TIMESTAMPTZ, NOT NULL)
+- deleted_at (TIMESTAMPTZ, NULL)
 
 설명:
 - `document_type`은 `markdown`, `html` 등을 가질 수 있다.
 - HTML도 Markdown과 동일한 documents 엔티티를 사용한다.
+- `status`는 `draft`, `published`, `archived` 세 가지 라이프사이클 상태를 나타낸다.
+- 삭제는 별도 `status` 값이 아니라 `deleted_at` timestamp로 표현한다.
+- `deleted_at`이 NULL이 아니면 soft deleted 문서로 간주한다.
+- `current_version_id`는 현재 렌더링/조회 기준이 되는 버전을 가리킨다.
+- `created_by`는 초기에는 nullable로 두고, 사용자 모델 정리 후 FK를 검토한다.
 
 ### 3. document_versions
 문서 내용의 시점별 스냅샷이다.
 
-주요 컬럼 예시:
-- id
-- document_id
-- version_no
-- source_type
-- content_snapshot
-- checksum
-- created_by
-- created_at
+주요 컬럼:
+- id (UUID)
+- document_id (UUID, NOT NULL)
+- version_no (INTEGER, NOT NULL)
+- source_type (VARCHAR, NOT NULL)
+- content_snapshot (TEXT, NOT NULL)
+- checksum (VARCHAR, NULL)
+- created_by (UUID, NULL)
+- created_at (TIMESTAMPTZ, NOT NULL)
 
 설명:
 - 하나의 Document는 여러 Version을 가진다.
 - 현재 사용 버전은 `documents.current_version_id`로 가리킨다.
+- `version_no`는 하나의 문서 안에서 1부터 증가하는 순번이다.
+- `source_type`은 해당 버전 시점의 문서 소스 타입(`markdown`, `html`)을 기록한다.
+- `content_snapshot`은 초기 구현에서는 DB text로 저장하며, 장기적으로 MinIO 저장을 검토할 수 있다.
+- `created_by`는 초기에는 nullable로 두고, 사용자 모델 정리 후 FK를 검토한다.
+- 버전은 이력 보존이 목적이므로 soft delete를 적용하지 않는다.
 
 ### 4. files
 첨부파일 메타데이터를 저장한다.
@@ -199,38 +214,81 @@ Websidian의 ERD는 다음 원칙을 따른다.
 초기 단계에서 중요한 무결성 규칙은 다음과 같다.
 
 ### 1. 문서는 반드시 Vault에 속해야 한다
-`documents.vault_id`는 not null이어야 한다.
+`documents.vault_id`는 NOT NULL이어야 한다.
 
 ### 2. 대표 문서는 같은 Vault 안에 있어야 한다
 `vaults.entry_document_id`는 동일 Vault의 문서를 가리켜야 한다.
 
 ### 3. 현재 버전은 해당 문서의 버전이어야 한다
-`documents.current_version_id`는 반드시 같은 `document_id`를 가진 version이어야 한다.
+`documents.current_version_id`는 반드시 같은 `document_id`를 가진 `document_versions.id`를 참조해야 한다.
 
-### 4. 링크는 우선 내부 문서 기준으로 관리한다
+First cut 구현에서는:
+- FK constraint로 `current_version_id -> document_versions.id`를 우선 설정한다.
+- "같은 document의 version인지" 조건은 애플리케이션 서비스에서 우선 검증한다.
+- 이후 필요하면 trigger 또는 추가 제약으로 강화할 수 있다.
+
+### 4. 같은 Vault 안에서 문서 slug는 유일해야 한다
+`UNIQUE (vault_id, slug)` 제약을 둔다.
+
+### 5. 하나의 문서 안에서 버전 번호는 중복될 수 없다
+`UNIQUE (document_id, version_no)` 제약을 둔다.
+
+### 6. 링크는 우선 내부 문서 기준으로 관리한다
 내부 문서 링크는 `target_document_id`를 채우고, 외부 링크는 `raw_target`만 유지할 수 있다.
 
-### 5. 파일 메타데이터와 실제 객체 키는 1:1 대응해야 한다
+### 7. 파일 메타데이터와 실제 객체 키는 1:1 대응해야 한다
 `files.object_key`는 유일해야 하며 실제 MinIO 객체와 대응해야 한다.
+
+### 8. 삭제는 soft delete 우선
+문서 삭제는 `deleted_at` timestamp를 채우는 방식으로 처리한다.
+- 활성 문서: `deleted_at IS NULL`
+- 삭제 문서: `deleted_at IS NOT NULL`
+
+이 방식은 `status`와 삭제 처리를 분리하여, 라이프사이클 상태(Draft/Published/Archived)와 운영적 삭제 처리를 독립적으로 관리할 수 있게 한다.
+
+Vault도 같은 soft delete 정책을 따른다.
+
+### 9. 사용자 관계는 초기에는 nullable FK로 둔다
+`vaults.owner_id`, `documents.created_by`, `document_versions.created_by` 등은 first cut에서는 nullable로 두고, 애플리케이션에서 감사 로깅을 우선 처리한다.
+
+사용자 모델이 정리되면:
+- FK constraint를 추가한다.
+- nullable에서 NOT NULL로 전환을 검토한다.
 
 ## Recommended First ERD Cut
 
 초기 구현에서는 모든 엔티티를 한 번에 만들지 않아도 된다.
-첫 번째 ERD 컷은 아래 정도면 충분하다.
 
-필수:
-- vaults
+### First Migration Cut (V1)
+
+`feat(document): basic document and version persistence` 이슈 기준 최소 범위:
+- vaults (documents가 vault_id FK를 요구하므로 필수)
 - documents
 - document_versions
+
+이 세 테이블만으로도 문서 메타데이터, 버전 이력, soft delete, 상태 관리 흐름을 검증할 수 있다.
+
+### Second Migration Cut (V2)
+
+다음 단계에서 추가 가능한 엔티티:
 - files
+- document_file_refs
 - document_links
 
-그 다음:
+이 테이블들은 파일 첨부, 문서 간 링크/임베드를 다루는 단계에서 추가한다.
+
+### Third Migration Cut (V3 이후)
+
+장기적으로 추가할 엔티티:
 - tags
 - document_tags
-- users
+- users (현재는 최소 수준)
 - permissions
-- document_file_refs
+
+이렇게 단계를 나누면:
+- 첫 migration은 Document/Version persistence에 집중할 수 있다.
+- 후속 기능을 점진적으로 붙이기 쉽다.
+- 초기 복잡도를 낮춰 빠르게 실행 가능한 상태로 만들 수 있다.
 
 ## Open Questions
 

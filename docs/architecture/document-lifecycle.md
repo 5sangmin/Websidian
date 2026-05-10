@@ -9,7 +9,7 @@ Websidian은 Markdown과 HTML을 모두 문서로 다루기 때문에, 단순 �
 
 ## Lifecycle Scope
 
-이 문서에서 말하는 “문서”는 다음을 포함한다.
+이 문서에서 말하는 "문서"는 다음을 포함한다.
 
 - Markdown 문서
 - HTML 문서
@@ -19,7 +19,17 @@ Websidian은 Markdown과 HTML을 모두 문서로 다루기 때문에, 단순 �
 
 ## Lifecycle Stages
 
-초기 Websidian의 문서 상태는 다음 4단계로 정의한다.
+Websidian의 문서 라이프사이클은 **3가지 상태(status)와 삭제 플래그(deleted_at)**로 구성된다.
+
+### 상태(status): Draft, Published, Archived
+
+문서의 공개 수준과 탐색 가능성을 나타내는 라이프사이클 상태다.
+
+### 삭제(deleted_at): 논리적 삭제 처리
+
+상태와 독립적으로 관리되는 soft delete 플래그다.
+
+---
 
 ### 1. Draft
 작성 중인 상태다.
@@ -48,13 +58,20 @@ Websidian은 Markdown과 HTML을 모두 문서로 다루기 때문에, 단순 �
 - 기록 보존 용도
 - 복구 가능
 
-### 4. Deleted
+### 4. Deleted (논리적 삭제)
 논리적으로 삭제된 상태다.
 
 특징:
 - 사용자 기본 UI에서는 보이지 않음
-- 복구 정책이 있다면 soft delete로 관리 가능
+- DB에서는 `deleted_at` timestamp가 NULL이 아닌 상태로 표현됨
+- `status` 컬럼은 Draft/Published/Archived 중 하나를 유지하며, 삭제는 별도 처리됨
+- 복구 정책이 있다면 `deleted_at`을 NULL로 되돌려 soft delete 복구 가능
 - 실제 파일 삭제는 지연 처리할 수 있음
+
+구현 방식:
+- `documents.deleted_at IS NOT NULL`이면 삭제된 문서로 간주
+- 삭제는 `status` 값 변경이 아니라 timestamp 기록으로 처리
+- 이 방식은 라이프사이클 상태(Draft/Published/Archived)와 운영적 삭제 처리를 독립적으로 관리할 수 있게 함
 
 ## Lifecycle Events
 
@@ -83,15 +100,46 @@ Archived 또는 Deleted 상태의 문서를 다시 복구한다.
 문서를 삭제한다.
 초기에는 soft delete를 우선 고려한다.
 
+구현 방식:
+- `documents.deleted_at` 컬럼에 현재 timestamp를 기록
+- `status` 값은 변경하지 않음 (Draft/Published/Archived 유지)
+- 조회 시 `deleted_at IS NULL` 조건으로 활성 문서만 필터링
+- 복구 시에는 `deleted_at`을 NULL로 되돌림
+
 ## Versioning Rules
 
 Websidian은 문서 상태와 별도로 버전 이력을 관리한다.
 
 원칙:
 - 문서 수정은 기존 버전을 덮어쓰지 않고 새 버전을 생성한다.
-- Published 문서도 수정 시 새 Draft 버전을 만들지, 곧바로 교체할지 정책이 필요하다.
-- 초기에는 단순화를 위해 “저장 시 새 버전 생성, current version 교체” 전략을 사용할 수 있다.
-- 장기적으로는 초안 버전과 공개 버전을 분리하는 모델도 검토할 수 있다.
+- 하나의 문서는 여러 `document_versions`를 가지며, `documents.current_version_id`가 현재 기준 버전을 가리킨다.
+- 버전은 이력 보존이 목적이므로 soft delete를 적용하지 않는다.
+
+### First Cut 정책: 저장 시 새 버전 생성, current version 즉시 교체
+
+초기 MVP에서는 단순화를 위해 다음 전략을 사용한다.
+
+문서 생성:
+1. `documents` 레코드 생성 (`current_version_id`는 우선 NULL)
+2. `document_versions` 레코드 생성 (`version_no = 1`)
+3. 생성된 version의 id로 `documents.current_version_id` 갱신
+
+문서 수정:
+1. 기존 문서 조회
+2. 같은 `document_id`로 새 `document_versions` 레코드 생성
+3. `version_no`는 기존 최대값 + 1
+4. `documents.current_version_id`를 새 버전 id로 즉시 교체
+5. `documents.updated_at` 갱신
+
+이 방식의 특징:
+- Published 문서도 수정 시 새 버전을 만들고 곧바로 교체함
+- 별도 초안 버전과 공개 버전을 분리하지 않음
+- 구현이 단순하고, 버전 이력은 그대로 누적됨
+
+### 장기 검토 사항
+
+Published 문서의 경우, 수정 시 새 Draft 버전을 만들어 검토 후 승인하는 워크플로를 도입할 수도 있다.
+이는 초기 MVP 이후, 실제 사용 패턴이 생긴 뒤 검토한다.
 
 ## Attachment Lifecycle
 
@@ -112,12 +160,25 @@ Websidian은 문서 상태와 별도로 버전 이력을 관리한다.
 
 초기 상태 전이 규칙은 다음처럼 둔다.
 
-- Draft -> Published: 가능
-- Draft -> Deleted: 가능
-- Published -> Archived: 가능
-- Archived -> Published: 가능
-- Archived -> Deleted: 가능
-- Deleted -> Draft 또는 Archived: 복구 정책이 있을 경우 가능
+### 라이프사이클 상태 전이 (`status` 컬럼)
+
+- Draft → Published: 가능
+- Draft → Archived: 가능
+- Published → Draft: 가능 (재편집 또는 공개 철회 시)
+- Published → Archived: 가능
+- Archived → Published: 가능
+- Archived → Draft: 가능 (재편집 시)
+
+### 삭제 처리 (`deleted_at` 컬럼)
+
+- 어떤 `status`에서든 삭제 가능 (`deleted_at`에 timestamp 기록)
+- 삭제된 문서는 `status`와 무관하게 기본 UI에서 숨김 처리
+- 복구 시 `deleted_at`을 NULL로 되돌리면, 이전 `status` 그대로 복원됨
+
+주의:
+- 삭제는 `status` 전이가 아니라 별도 timestamp 기록으로 처리함
+- Draft → Deleted, Published → Deleted 같은 표현은 편의상 사용하지만,
+  실제로는 `status`는 변하지 않고 `deleted_at`만 채워짐
 
 직접 전이를 제한할지 여부는 운영 정책에 따라 달라질 수 있지만, MVP에서는 너무 복잡하게 만들지 않는다.
 
@@ -129,6 +190,8 @@ Websidian은 문서 상태와 별도로 버전 이력을 관리한다.
 - Published: 공개 Vault라면 방문자 접근 가능
 - Archived: 기본 탐색에서는 숨기되 직접 접근은 허용 가능
 - Deleted: 기본적으로 접근 불가
+  - `deleted_at IS NOT NULL`인 문서는 기본 조회 쿼리에서 제외
+  - 복구 UI나 관리자 전용 뷰에서만 조회 가능
 
 초기 MVP는 복잡한 역할 기반 권한보다 상태 중심 접근 제어로 시작하는 것이 현실적이다.
 
@@ -154,15 +217,26 @@ HTML 문서는 일반 문서 상태 외에 렌더링 보안 고려가 추가된�
 
 초기 MVP에서는 다음 정책을 권장한다.
 
-- 문서 상태: Draft / Published / Archived
-- 삭제는 우선 soft delete
+### 문서 상태 관리
+- 라이프사이클 상태: Draft / Published / Archived (`status` 컬럼)
+- 삭제 처리: soft delete (`deleted_at` timestamp)
+- `status`와 `deleted_at`은 독립적으로 관리
+- 활성 문서: `deleted_at IS NULL`
+- 삭제 문서: `deleted_at IS NOT NULL`
+
+### 버전 관리
 - 저장 시마다 새 버전 생성
+- `documents.current_version_id`를 새 버전으로 즉시 교체
+- 초안/공개 버전 분리는 MVP 이후 검토
+
+### 기타 정책
 - 대표 문서는 Published 상태 문서만 지정 가능
 - HTML 문서도 같은 상태 모델을 사용
+- Vault도 동일한 soft delete 정책 적용
 
 이 정도면 구현 난도를 크게 높이지 않으면서도 향후 확장 가능한 기반을 마련할 수 있다.
 
 ## Summary
 
-Websidian의 문서 라이프사이클은 Draft, Published, Archived, Deleted 상태를 중심으로 설계한다.
+Websidian의 문서 라이프사이클은 Draft, Published, Archived 3가지 상태와 Deleted 플래그를 중심으로 설계한다.
 핵심은 문서 상태와 버전 이력을 분리하고, Markdown과 HTML 모두 같은 라이프사이클 틀 안에서 관리하되, HTML은 보안 렌더링 정책을 추가로 고려하는 것이다.
