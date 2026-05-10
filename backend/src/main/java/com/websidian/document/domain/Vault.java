@@ -2,6 +2,7 @@ package com.websidian.document.domain;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
@@ -51,7 +52,7 @@ public class Vault {
     @Column(name = "description")
     private String description;
 
-    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Convert(converter = VisibilityConverter.class)
     @Column(name = "visibility", nullable = false, length = 50)
     private Visibility visibility = Visibility.PRIVATE;
 
@@ -110,8 +111,13 @@ public class Vault {
     }
 
     public void changeEntryDocument(Document entryDocument) {
-        if (entryDocument != null && entryDocument.getVault() != this) {
-            throw new IllegalArgumentException("Entry document must belong to the same vault.");
+        if (entryDocument != null) {
+            if (entryDocument.getVault() != this) {
+                throw new IllegalArgumentException("Entry document must belong to the same vault.");
+            }
+            if (entryDocument.getStatus() != DocumentStatus.PUBLISHED) {
+                throw new IllegalArgumentException("Entry document must be published.");
+            }
         }
         this.entryDocument = entryDocument;
     }

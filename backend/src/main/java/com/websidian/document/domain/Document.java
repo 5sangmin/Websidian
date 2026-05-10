@@ -2,9 +2,8 @@ package com.websidian.document.domain;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
@@ -59,11 +58,11 @@ public class Document {
     @Column(name = "title", nullable = false, length = 1000)
     private String title;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = DocumentTypeConverter.class)
     @Column(name = "document_type", nullable = false, length = 50)
     private DocumentType documentType;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = DocumentStatusConverter.class)
     @Column(name = "status", nullable = false, length = 50)
     private DocumentStatus status = DocumentStatus.DRAFT;
 
@@ -94,6 +93,16 @@ public class Document {
     }
 
     public Document(String slug, String title, DocumentType documentType) {
+        if (slug == null || slug.isBlank()) {
+            throw new IllegalArgumentException("slug must not be blank");
+        }
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("title must not be blank");
+        }
+        if (documentType == null) {
+            throw new IllegalArgumentException("documentType must not be null");
+        }
+
         this.slug = slug;
         this.title = title;
         this.documentType = documentType;
@@ -122,6 +131,7 @@ public class Document {
         }
 
         this.versions.remove(version);
+        version.assignDocument(null);
 
         if (this.currentVersion != null && this.currentVersion.equals(version)) {
             this.currentVersion = null;
@@ -141,10 +151,16 @@ public class Document {
     }
 
     public void changeTitle(String title) {
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("title must not be blank");
+        }
         this.title = title;
     }
 
     public void publish() {
+        if (this.currentVersion == null) {
+            throw new IllegalStateException("Document must have current version before publish.");
+        }
         this.status = DocumentStatus.PUBLISHED;
     }
 
